@@ -10,6 +10,10 @@ from fastapi.testclient import TestClient
 
 from gateway.main import app
 from gateway.cache.redis_semantic_cache import RedisSemanticCache
+from tests._live import REDIS_REASON, SEMANTIC_REASON, embedder_available, redis_available
+
+LIVE = pytest.mark.skipif(not redis_available(), reason=REDIS_REASON)
+SEMANTIC = pytest.mark.skipif(not (redis_available() and embedder_available()), reason=SEMANTIC_REASON)
 
 client = TestClient(app)
 ADMIN_KEY = "test-admin-key"
@@ -33,6 +37,7 @@ def test_admin_cache_purge_requires_auth():
     assert "purged_count" in r_auth.json()
 
 
+@SEMANTIC
 def test_admin_cache_purge_semantic_invalidation():
     """Verify that POST /cache/purge eradicates semantic matches >= 0.85 from Redis."""
     cache = RedisSemanticCache.get_instance()
@@ -65,6 +70,7 @@ def test_admin_cache_purge_semantic_invalidation():
     assert hit_after is None, "Poisoned entry should have been completely purged from Redis!"
 
 
+@LIVE
 def test_cache_hit_provenance_and_badge():
     """Verify that cached responses include provenance metadata and a 'Cached answer' badge."""
     cache = RedisSemanticCache.get_instance()

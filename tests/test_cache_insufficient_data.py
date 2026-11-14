@@ -3,6 +3,9 @@
 
 import unittest
 from gateway.cache.redis_semantic_cache import RedisSemanticCache
+from tests._live import REDIS_REASON, redis_available
+
+LIVE = unittest.skipUnless(redis_available(), REDIS_REASON)
 
 
 class TestCacheInsufficientDataFiltering(unittest.TestCase):
@@ -76,6 +79,7 @@ class TestCacheInsufficientDataFiltering(unittest.TestCase):
                 f"Expected factual answer with retrieved chunks to be cacheable, but got: {reason}"
             )
 
+    @LIVE
     def test_store_bypassed_for_zero_chunks(self):
         """Verify that store() rejects and does not write answers when 0 document chunks were retrieved."""
         dummy_query = "What is the secret formula for dark matter?"
@@ -93,6 +97,7 @@ class TestCacheInsufficientDataFiltering(unittest.TestCase):
         lookup_result = self.cache.lookup(dummy_query)
         self.assertIsNone(lookup_result, "Lookup should return None because response was never cached.")
 
+    @LIVE
     def test_exact_fast_path_purges_poisoned_zero_chunk_entries(self):
         """Verify that fast exact lookup purges poisoned zero-chunk entries upon encounter."""
         import hashlib, json
@@ -115,6 +120,7 @@ class TestCacheInsufficientDataFiltering(unittest.TestCase):
         self.assertIsNone(res, "Lookup should reject exact match with zero chunks.")
         self.assertIsNone(self.cache.sync_client.get(exact_key), "Poisoned exact key should be deleted from Redis.")
 
+    @LIVE
     def test_store_bypassed_for_insufficient_data(self):
         """Verify that store() rejects and does not write insufficient data responses."""
         dummy_query = "What is the secret formula for dark matter?"
@@ -131,6 +137,7 @@ class TestCacheInsufficientDataFiltering(unittest.TestCase):
         lookup_result = self.cache.lookup(dummy_query)
         self.assertIsNone(lookup_result, "Lookup should return None because response was never cached.")
 
+    @LIVE
     def test_purge_uncacheable_entries(self):
         """Verify that purge_uncacheable_entries() removes poisoned records."""
         # Clean test

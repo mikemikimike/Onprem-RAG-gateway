@@ -70,6 +70,54 @@ def test_pool_times_out_instead_of_queueing_forever():
     run(main())
 
 
+# Python 3.10 has no asyncio.timeout; acquire() then takes its fallback path. Exercise it here too.
+@pytest.fixture
+def py310(monkeypatch):
+    if hasattr(asyncio, "timeout"):
+        monkeypatch.delattr(asyncio, "timeout")
+
+
+def test_pool_fallback_times_out_with_builtin_timeout_error(py310):
+    async def main():
+        pool = srv.SlotPool([FakeEngine()])
+        e = await pool.acquire(0.1)
+        t0 = time.time()
+        with pytest.raises(TimeoutError):
+            await pool.acquire(0.2)
+        assert time.time() - t0 < 1.0
+        pool.release(e)
+        await asyncio.sleep(0)
+        assert pool.free == 1, "a timed-out wait must not keep a slot"
+        assert await pool.acquire(0.1) is e
+    run(main())
+
+
+def test_pool_fallback_waiter_gets_a_released_slot(py310):
+    async def main():
+        pool = srv.SlotPool([FakeEngine()])
+        e = await pool.acquire(0.1)
+        waiter = asyncio.ensure_future(pool.acquire(2))
+        await asyncio.sleep(0.05)
+        pool.release(e)
+        assert await waiter is e
+    run(main())
+
+
+def test_pool_fallback_cancelled_waiter_does_not_leak_a_slot(py310):
+    async def main():
+        pool = srv.SlotPool([FakeEngine()])
+        e = await pool.acquire(0.1)
+        waiter = asyncio.ensure_future(pool.acquire(5))
+        await asyncio.sleep(0.05)
+        waiter.cancel()
+        pool.release(e)  # released while the cancelled waiter is being torn down
+        with pytest.raises(asyncio.CancelledError):
+            await waiter
+        await asyncio.sleep(0.05)
+        assert pool.free == 1, "the slot must come back to the pool"
+    run(main())
+
+
 def test_stream_completes_and_returns_slot():
     async def main():
         eng = FakeEngine(n_tokens=5, delay=0)

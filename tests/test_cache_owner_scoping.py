@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from tests._live import SEMANTIC_REASON, embedder_available
 from gateway.cache.redis_semantic_cache import RedisSemanticCache
 
 ALICE, BOB, MALLORY = "alice@iisc.ac.in", "bob@iisc.ac.in", "mallory@iisc.ac.in"
@@ -29,6 +30,8 @@ def cache():
         assert c.init_index()
     except Exception as exc:
         pytest.skip(f"Redis not available: {exc}")
+    if not embedder_available():
+        pytest.skip(SEMANTIC_REASON)  # paraphrase matching needs the real embedding model
     return c
 
 

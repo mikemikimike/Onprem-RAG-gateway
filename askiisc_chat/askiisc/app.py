@@ -23,6 +23,7 @@ class ChatReq(BaseModel):
     history: list[dict] = []
     thesis_id: str | None = None
     force: str | None = None          # "slm" | "llm" | None (auto)
+    regenerate_token: str | None = Field(default=None, max_length=128)  # from a cached answer (gateway backend)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -139,7 +140,8 @@ async def chat(req: ChatReq, request: Request):
     if C.REQUIRE_LOGIN and not user:
         return JSONResponse({"error": "Sign in with your IISc email to use AskIISc."}, status_code=401)
     if C.BACKEND == "gateway":
-        return StreamingResponse(stream_via_gateway(req.message, tier), media_type="text/event-stream",
+        return StreamingResponse(stream_via_gateway(req.message, tier, user_email=(user or {}).get("email", ""),
+                                                    regenerate_token=req.regenerate_token), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     async def gen():
         t0 = time.perf_counter(); tr = {"ts": time.time(), "tier": tier, "user": user and hashlib.sha256(user["sub"].encode()).hexdigest()[:10], "q_len": len(req.message), "thesis": req.thesis_id}

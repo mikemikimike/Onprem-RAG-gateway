@@ -20,7 +20,10 @@ import pytest
 import gateway.cache.redis_semantic_cache as M
 from gateway.cache.redis_semantic_cache import RedisSemanticCache
 
-ALICE, BOB, CAROL, DAVE = "alice@iisc.ac.in", "bob@iisc.ac.in", "carol@iisc.ac.in", "dave@iisc.ac.in"
+# Fresh identities per run: the live tests make several regenerate attempts and the real per-user quota
+# (20 per hour) would otherwise reject repeated runs of `make test` with HTTP 429.
+_RUN = uuid.uuid4().hex[:6]
+ALICE, BOB, CAROL, DAVE = (f"{n}-{_RUN}@iisc.ac.in" for n in ("alice", "bob", "carol", "dave"))
 ROOT = Path(__file__).resolve().parent.parent
 
 

@@ -73,9 +73,31 @@ class SlotPool:
         return self._free.qsize()
 
     async def acquire(self, timeout: float):
-        # asyncio.Queue.get never loses an item on cancellation, so a timeout cannot leak a slot.
-        async with asyncio.timeout(timeout):
-            return await self._free.get()
+        """Raises the built-in TimeoutError when no slot frees up in time (callers catch that)."""
+        if hasattr(asyncio, "timeout"):  # Python >= 3.11
+            # asyncio.Queue.get never loses an item on cancellation, so a timeout cannot leak a slot.
+            async with asyncio.timeout(timeout):
+                return await self._free.get()
+        # Python 3.10: no asyncio.timeout, and asyncio.wait_for there can drop a result that arrives just
+        # as the timeout fires (a leaked slot). Wait on the get explicitly and keep any slot it obtained.
+        task = asyncio.ensure_future(self._free.get())
+        try:
+            done, _ = await asyncio.wait({task}, timeout=timeout)
+            if task in done:
+                return task.result()
+            task.cancel()
+            await asyncio.wait({task})  # never raises the task's own cancellation
+            if not task.cancelled() and task.exception() is None:
+                return task.result()  # it got a slot just before the cancel took effect: keep it
+            raise TimeoutError()
+        except asyncio.CancelledError:  # the caller itself was cancelled while waiting
+            task.cancel()
+            task.add_done_callback(self._give_back)
+            raise
+
+    def _give_back(self, task: "asyncio.Future") -> None:
+        if not task.cancelled() and task.exception() is None:
+            self._free.put_nowait(task.result())
 
     def release(self, engine: Any) -> None:
         try:

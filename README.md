@@ -490,20 +490,28 @@ python scripts/prod_stack.py stop [--with-vllm]
 
 The codebase includes an extensive suite of unit, security, and intensive end-to-end integration tests:
 
-### Running Full Pytest Suite:
+### Running the Test Suite:
 ```bash
-# Via Make:
+make setup     # once: .venv + requirements (make test then uses .venv/bin/python; override with PYTHON=...)
 make test
-
-# Via Native Pytest:
-pytest tests/ -v
 ```
+`make test` passes on a fresh clone with nothing running (Python 3.10+). Checks that need live services
+skip with a reason instead of failing, and run once those services are available:
 
-### Semantic Cache Intent-Guard Suites:
-`make test` includes [`tests/test_cache_intent_guard.py`](tests/test_cache_intent_guard.py) and [`tests/test_cache_intent_guard_extensive.py`](tests/test_cache_intent_guard_extensive.py) (rule, real-embedding, live Redis and live gateway checks). Known limits are recorded as `xfail`; see §9 of the [PRD](product_requirements_document.md).
-```bash
-PYTHONPATH=. pytest -q tests/test_cache_intent_guard.py tests/test_cache_intent_guard_extensive.py
-```
+| Needs | Tests | How to enable |
+|---|---|---|
+| Nothing | unit, security, routing, gate and route-level tests (fakes for Redis and models) | always run |
+| Redis Stack | exact-match cache, regenerate tokens, purge | §4, `make redis-up` |
+| Redis Stack + embedding model | semantic (paraphrase) cache, owner scoping | `make download-models` |
+| Ingested thesis index | live retrieval (topic, rare-term, dynamic floor) | §5 ingestion |
+| Running gateway on :8080 | live `/query` and `/chat` checks | `make prod-up` |
+
+`make test` never downloads models (`HF_HUB_OFFLINE=1`; override with `make test HF_HUB_OFFLINE=0`).
+Run it through `make`: several files in `tests/` are standalone scripts, so a bare `pytest tests/` is not supported.
+
+Red-team regression tests that contain the red team's attack data are kept out of the public repository;
+`make test` runs them where present and otherwise prints that it skipped them. Known limits are recorded
+as `xfail`; see §9 of the [PRD](product_requirements_document.md).
 
 ### Running Intensive Full-Stack Verification:
 Verifies live MLP routing, CPU SLM TTFT, GPU vLLM throughput, Redis semantic cache exact and paraphrase hits, and output sanitization:

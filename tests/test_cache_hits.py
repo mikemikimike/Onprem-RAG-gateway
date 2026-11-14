@@ -1,6 +1,9 @@
 import asyncio
 import pytest
 from gateway.cache.redis_semantic_cache import RedisSemanticCache
+from tests._live import REDIS_REASON, redis_available
+
+pytestmark = pytest.mark.skipif(not redis_available(), reason=REDIS_REASON)
 
 @pytest.mark.asyncio
 async def test_semantic_cache():
@@ -30,5 +33,8 @@ async def test_semantic_cache():
         assert cache.lookup(query) is None
 
 if __name__ == "__main__":
+    if not redis_available():
+        print(f"Skipped: {REDIS_REASON}")
+        raise SystemExit(0)
     asyncio.run(test_semantic_cache())
     print("Redis semantic cache hit tests passed.")

@@ -9,6 +9,7 @@ pydantic>=2.7.0
 pydantic-settings>=2.3.0
 httpx>=0.27.0
 python-multipart>=0.0.9
+itsdangerous>=2.1.0  # signed session cookies (Starlette SessionMiddleware)
 
 # --- Deep Learning, Transformers & SLM Tier ---
 torch>=2.1.0
@@ -17,6 +18,8 @@ accelerate>=0.30.0
 tokenizers>=0.19.0
 sentence-transformers>=3.0.0
 huggingface-hub>=0.20.0
+# CPU tier runtime (GGUF), needed to serve the 3B model but not for `make test`; may compile from source:
+#   pip install llama-cpp-python>=0.2.90
 
 # --- Neural Complexity Router & Data Science ---
 numpy>=1.26.0
@@ -44,6 +47,8 @@ requests>=2.32.0
 
 # --- Evaluation, Benchmarking & Testing ---
 locust>=2.29.0
+aiohttp>=3.9.0  # scripts/load_test.py, scripts/run_100_uncached_load_test.py
+psutil>=5.9.0
 pytest>=8.2.0
 pytest-asyncio>=0.23.7
 
