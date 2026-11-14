@@ -3,6 +3,9 @@
 
 import unittest
 from pipeline.retriever import RedisChunkRetriever
+from tests._live import INDEX_REASON, thesis_index_available
+
+LIVE = unittest.skipUnless(thesis_index_available(), INDEX_REASON)
 
 
 class TestDynamicScoreRetrieval(unittest.TestCase):
@@ -87,6 +90,7 @@ class TestDynamicScoreRetrieval(unittest.TestCase):
         keys = [c["chunk_key"] for c in selected]
         self.assertEqual(keys, ["c1", "c2"])
 
+    @LIVE
     def test_live_out_of_domain_rejection(self):
         """Live test: completely out-of-domain query returns 0 chunks in dynamic mode."""
         chunks = self.retriever.search(
@@ -99,6 +103,7 @@ class TestDynamicScoreRetrieval(unittest.TestCase):
             f"Expected 0 chunks for out-of-domain query, got {len(chunks)}: {[c['similarity'] for c in chunks]}"
         )
 
+    @LIVE
     def test_live_philosophical_out_of_domain_rejection(self):
         """Live test: philosophical/abstract queries without grounded documents return 0 chunks."""
         for query in ["what is the meaning of meaning", "what is the meaning of life"]:
@@ -109,6 +114,7 @@ class TestDynamicScoreRetrieval(unittest.TestCase):
                 f"Expected 0 chunks for '{query}', got {len(chunks)}: {[c.get('similarity') for c in chunks]}"
             )
 
+    @LIVE
     def test_live_in_domain_dynamic_retrieval(self):
         """Live test: genuine in-domain query retrieves multiple relevant chunks with high similarity."""
         chunks = self.retriever.search(
@@ -128,6 +134,7 @@ class TestDynamicScoreRetrieval(unittest.TestCase):
                 f"Chunk {c.get('title', 'chunk')} similarity {c['similarity']} was below 0.48 floor"
             )
 
+    @LIVE
     def test_response_excludes_internal_keys(self):
         """Verify chunk_key, handle_id, chunk_index, and vector are not returned in chunks."""
         chunks = self.retriever.search(

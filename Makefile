@@ -3,9 +3,12 @@
 -include .env
 export
 
-CONDA_ENV_PYTHON := $(if $(CONDA_PREFIX),$(CONDA_PREFIX)/bin/python,/data2/home/ritujmanware/miniconda3/envs/rag_env/bin/python)
-PYTHON ?= $(if $(wildcard $(CONDA_ENV_PYTHON)),$(CONDA_ENV_PYTHON),python3)
 VENV ?= .venv
+# Interpreter: override with `make PYTHON=...`; otherwise the first that exists of
+#   the .venv made by `make setup`, the active conda env, the team server's rag_env, python3.
+CONDA_ENV_PYTHON := $(if $(CONDA_PREFIX),$(CONDA_PREFIX)/bin/python,)
+TEAM_SERVER_PYTHON := /data2/home/ritujmanware/miniconda3/envs/rag_env/bin/python
+PYTHON ?= $(firstword $(wildcard $(VENV)/bin/python $(CONDA_ENV_PYTHON) $(TEAM_SERVER_PYTHON)) python3)
 REDIS_PASSWORD ?= $(shell grep -E '^REDIS_PASSWORD=' .env 2>/dev/null | cut -d '=' -f2-)
 MODEL_7B_PATH ?= models/llm_7b/qwen2.5-7b-instruct
 
@@ -202,10 +205,14 @@ cache-check:
 # fresh clone does not have them. `make test` runs them when present and says so when they are skipped.
 PRIVATE_TESTS := tests/test_cache_intent_guard.py tests/test_cache_intent_guard_extensive.py tests/test_refusal_mixed.py
 
+# `make test` never downloads models (a fresh clone without internet would hang on HuggingFace retries):
+# model-dependent checks skip until `make download-models` has run. Override: make test HF_HUB_OFFLINE=0
+test: export HF_HUB_OFFLINE ?= 1
+test: export TRANSFORMERS_OFFLINE ?= $(HF_HUB_OFFLINE)
 test:
 	PYTHONPATH=. $(PYTHON) tests/test_admission_queue.py
 	PYTHONPATH=. $(PYTHON) -m pytest tests/test_single_port_security.py
-	PYTHONPATH=. $(PYTHON) -m pytest tests/test_vllm_launcher.py tests/test_dispatcher_threshold.py tests/test_cache_owner_scoping.py tests/test_cache_regenerate.py tests/test_premise_rules.py tests/test_premise_routing.py tests/test_topic_retrieval.py tests/test_topic_speller.py tests/test_rare_terms.py tests/test_ungrounded_and_admin_guard.py tests/test_slm_slots.py tests/test_retrieval_warmup.py tests/test_embedder_onnx.py tests/test_cache_index_alter.py
+	PYTHONPATH=. $(PYTHON) -m pytest tests/test_vllm_launcher.py tests/test_dispatcher_threshold.py tests/test_cache_owner_scoping.py tests/test_cache_regenerate.py tests/test_premise_rules.py tests/test_premise_routing.py tests/test_topic_retrieval.py tests/test_topic_speller.py tests/test_rare_terms.py tests/test_ungrounded_and_admin_guard.py tests/test_standalone_app_identity.py tests/test_slm_slots.py tests/test_retrieval_warmup.py tests/test_embedder_onnx.py tests/test_cache_index_alter.py
 	PYTHONPATH=. $(PYTHON) -m pytest tests/test_break_hardening.py tests/test_cache_purge_and_ttl.py tests/test_constant_time_and_cookie_security.py tests/test_dos_boundary_validation.py tests/test_otp_concurrency.py tests/test_refusal_chunks.py tests/test_typo_normalizer.py
 	@present="$(wildcard $(PRIVATE_TESTS))"; \
 	if [ -n "$$present" ]; then PYTHONPATH=. $(PYTHON) -m pytest $$present; \
